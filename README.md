@@ -2,6 +2,8 @@
 
 **Design and Analysis of Algorithms: Framework Assignment 2** · Group 11 · AI&ML Panthers
 
+Repository: https://github.com/ShreenandhK/ThermoSched-DAA
+
 | Member | Roll No. |
 |---|---|
 | M. Pranay Kumar Reddy | 25WU0102138 |
