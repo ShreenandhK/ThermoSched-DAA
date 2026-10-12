@@ -1,0 +1,4 @@
+n,height,height_bound,nodes_visited,comparisons,splits,insert_ms
+1000,6,6.66,5.52,11.22,491,1.6
+10000,8,8.75,7.53,15.72,4988,21.2
+50000,10,10.22,9.49,18.87,24984,123.9

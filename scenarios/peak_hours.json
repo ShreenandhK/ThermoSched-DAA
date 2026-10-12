@@ -1,0 +1,15 @@
+{
+  "name": "Peak hours - interactive server under heavy load",
+  "thermal_budget": 50,
+  "jobs_divisible": false,
+  "jobs": [
+    {"name": "J1 Matrix render",    "benefit": 60,  "thermal_cost": 10},
+    {"name": "J2 Log analytics",    "benefit": 100, "thermal_cost": 20},
+    {"name": "J3 Video encode",     "benefit": 120, "thermal_cost": 30},
+    {"name": "J4 ML training",      "benefit": 90,  "thermal_cost": 25},
+    {"name": "J5 Backup compress",  "benefit": 30,  "thermal_cost": 15}
+  ],
+  "matrix_pipeline": [10, 30, 5, 60, 10],
+  "priority_workload": {"jobs": 5000, "updates_per_dispatch": 1, "update_kind": "boost"},
+  "telemetry": {"records": 20000, "queries": 2000}
+}

@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+~$*
+
+# Local tooling
+.claude/
+
+# Course material and private viva preparation (not part of the repository)
+DAA_Framework_Assignments_for_Students.pdf
+Group_Details.txt
+Presenter_Guide/

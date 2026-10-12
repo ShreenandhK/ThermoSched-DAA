@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ThermoSched Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b0d10; --panel: #12151a; --well: #0e1115; --line: #1f242c; --line-2: #2a313b;
+    --ink: #e8eaed; --muted: #8b93a1; --dim: #5c6470;
+    --heat: #ff7a45; --heat-ink: #ff8a57; --cool: #5b8def; --good: #3ecf8e; --bad: #e5484d;
+    --series-1: #3987e5; --series-2: #d95926;
+    --ease: cubic-bezier(0.2, 0, 0, 1);            /* standard easing */
+    --ease-in: cubic-bezier(0.05, 0.7, 0.1, 1);    /* entering elements decelerate */
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 "IBM Plex Sans", system-ui, sans-serif;
+         font-variant-numeric: tabular-nums; }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+  @media (min-width: 640px) { .wrap { padding: 0 24px; } }
+  h2 { margin: 0; font-size: 26px; font-weight: 600; }
+
+  header { border-bottom: 1px solid var(--line); }
+  header .wrap { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding-top: 18px; padding-bottom: 18px; }
+  .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 18px; }
+  .logo { width: 28px; height: 28px; border-radius: 7px; background: var(--heat); display: grid; place-items: center; }
+  .live { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+  .live i { width: 8px; height: 8px; border-radius: 50%; background: var(--good); animation: ping 1.6s ease-in-out infinite; }
+
+  main.wrap { padding-top: 32px; padding-bottom: 72px; display: flex; flex-direction: column; gap: 24px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 22px;
+           animation: rise 700ms var(--ease-in) both; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .title { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .num { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--heat-ink); }
+  .tag { font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--muted); }
+  .eyebrow { font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: .12em; color: var(--muted); }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr)); gap: 24px; }
+
+  .seg { display: flex; gap: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 4px; flex-wrap: wrap; }
+  .seg button, .chip { border: 0; border-radius: 7px; padding: 10px 16px; min-height: 44px; font: inherit; font-size: 14px; cursor: pointer;
+                       background: transparent; color: var(--muted); transition: background-color 250ms ease, color 250ms ease; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); font-weight: 600; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { min-height: 36px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 13px; }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 600; }
+  button:focus-visible { outline: 2px solid var(--heat-ink); outline-offset: 2px; }
+  .icon-btn { min-height: 44px; min-width: 44px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg); color: var(--ink);
+              cursor: pointer; display: grid; place-items: center; }
+
+  /* hero */
+  .hero { flex-direction: row; flex-wrap: wrap; gap: 32px; }
+  .hero-main { flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 18px; }
+  .temp { font-size: clamp(72px, 12vw, 104px); line-height: .9; font-weight: 600; letter-spacing: -.04em; transition: color 500ms ease; }
+  .temp small { font-size: .38em; color: var(--muted); font-weight: 500; }
+  .status { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 8px 12px; border-radius: 8px; font: 12px "IBM Plex Mono", monospace;
+            letter-spacing: .1em; background: #10291c; color: var(--good); transition: background-color 300ms ease, color 300ms ease; }
+  .status.hot { background: #3a1215; color: #ff8a8f; animation: pulse 1.2s ease-in-out infinite; }
+  .spark { position: relative; height: 150px; border-radius: 10px; background: var(--well); border: 1px solid #1a1f26; overflow: hidden; }
+  .spark span { position: absolute; right: 10px; top: 6px; font: 11px "IBM Plex Mono", monospace; color: var(--bad); }
+  .runchip { padding: 6px 12px; border-radius: 999px; font: 13px "IBM Plex Mono", monospace; color: var(--dim); border: 1px dashed var(--line-2);
+             transition: all 400ms var(--ease); }
+  .runchip.on { background: #2a1a12; color: #ffb08c; border: 1px solid #5a2e1a; }
+  .die-wrap { flex: 1 1 340px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+  .die { padding: 22px; border-radius: 18px; background: var(--well); border: 1px solid #262c35; }
+  .cores { display: grid; grid-template-columns: repeat(4, 68px); gap: 6px; }
+  .core { height: 68px; border-radius: 8px; display: grid; place-items: center; font: 500 13px "IBM Plex Mono", monospace; transition: background-color 500ms ease; }
+  .legend { display: flex; align-items: center; gap: 10px; font: 11px "IBM Plex Mono", monospace; color: var(--muted); }
+  .legend b { width: 180px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #1b2a4a, #3b3a8c, #9c3b7f, #e0533d, #f59e3b, #ffe08a); }
+
+  /* admission */
+  .admit { display: flex; flex-wrap: wrap; gap: 32px; align-items: center; }
+  .stage { position: relative; height: 176px; flex: 999 1 560px; min-width: 0; }
+  .track { position: absolute; left: 0; right: 0; top: 0; height: 68px; border-radius: 10px; border: 1px dashed #343b46; }
+  .stage .lbl { position: absolute; left: 0; font: 11px "IBM Plex Mono", monospace; color: var(--muted); }
+  .block { position: absolute; display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 0 12px; border-radius: 8px;
+           font: 600 13px "IBM Plex Mono", monospace; overflow: hidden; white-space: nowrap;
+           transition: left 650ms var(--ease), top 650ms var(--ease), width 650ms var(--ease), height 650ms var(--ease), background-color 400ms ease, color 400ms ease; }
+  .block span:last-child { opacity: .75; }
+  .big { font-size: clamp(64px, 9vw, 88px); line-height: .9; font-weight: 600; letter-spacing: -.04em; }
+
+  /* race */
+  .lane { display: flex; flex-direction: column; gap: 8px; }
+  .lane .row { font: 14px "IBM Plex Mono", monospace; }
+  .bar { height: 14px; border-radius: 7px; background: #1a1f26; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; border-radius: 7px; transition: width 220ms linear; }
+  .steps { display: flex; gap: 3px; height: 14px; }
+  .steps > div { position: relative; background: #1a1f26; border-radius: 4px; overflow: hidden; }
+  .steps i { position: absolute; inset: 0 auto 0 0; width: 0; transition: width 220ms linear; }
+  .step-costs { display: flex; gap: 3px; font: 11px "IBM Plex Mono", monospace; color: var(--dim); }
+  .step-costs > span { overflow: hidden; white-space: nowrap; }
+
+  /* heaps */
+  .trees { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .minis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+  .mini { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .mini .box { position: relative; width: 200px; height: 150px; }
+  .mini svg, .tree svg { position: absolute; left: 0; top: 0; }
+  .dot { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: #2a313b; border: 2px solid #3a424e;
+         transition: left 650ms var(--ease), top 650ms var(--ease), border-color 300ms ease; }
+  .dot.hot { background: var(--heat); border-color: var(--heat); box-shadow: 0 0 0 4px rgba(255,122,69,.18); }
+  .dot.mark { border-color: var(--heat-ink); }
+  .hbar { display: flex; align-items: center; gap: 12px; }
+  .hbar > div:first-child { width: 74px; font-size: 13px; color: var(--muted); }
+  .hbar .bar { flex: 1; height: 12px; }
+  .hbar .bar i { transition: width 650ms var(--ease); }
+  .hbar > div:last-child { width: 56px; text-align: right; font: 13px "IBM Plex Mono", monospace; }
+
+  /* index */
+  .index { display: flex; flex-wrap: wrap; gap: 32px; align-items: center; }
+  .tree { position: relative; height: 170px; flex: 999 1 520px; min-width: 0; }
+  .tnode { position: absolute; background: #232932; transition: background-color 250ms ease, box-shadow 250ms ease; }
+  .tnode.lit { background: var(--cool); box-shadow: 0 0 0 4px rgba(91,141,239,.2); }
+  .tnode.scan { background: var(--heat); box-shadow: 0 0 0 4px rgba(255,122,69,.2); }
+  .imetrics { flex: 1 1 300px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 24px; }
+  .metric { font-size: 34px; font-weight: 600; letter-spacing: -.02em; }
+  .cap { font-size: 12px; color: var(--muted); }
+  .growth { display: flex; align-items: flex-end; gap: 10px; height: 56px; }
+  .growth > div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; font: 11px "IBM Plex Mono", monospace; color: var(--muted); }
+  .growth i { width: 100%; max-width: 28px; background: var(--cool); border-radius: 3px 3px 0 0; animation: rise 700ms var(--ease-in) both; }
+
+  /* scale */
+  .scale { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 24px; }
+  .scale .panel { padding: 22px 24px; gap: 12px; }
+  .draw { stroke-dasharray: 1200; stroke-dashoffset: 1200; animation: draw 1.8s var(--ease) forwards; }
+  .cols { display: flex; align-items: flex-end; gap: 14px; height: 120px; border-bottom: 1px solid var(--line); }
+  .cols > div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; font: 12px "IBM Plex Mono", monospace; }
+  .cols i { width: 100%; max-width: 40px; background: var(--heat); border-radius: 4px 4px 0 0; animation: rise 700ms var(--ease-in) both; }
+  .foot { display: flex; justify-content: space-between; gap: 8px; font: 12px "IBM Plex Mono", monospace; color: var(--muted); }
+  footer { color: var(--dim); font: 12px "IBM Plex Mono", monospace; }
+
+  @keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(62,207,142,.55); } 70% { box-shadow: 0 0 0 8px rgba(62,207,142,0); } 100% { box-shadow: 0 0 0 0 rgba(62,207,142,0); } }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } .draw { stroke-dashoffset: 0; } }
+  @media (max-width: 520px) {
+    .panel { padding: 20px 16px; }
+    .cores { grid-template-columns: repeat(4, 54px); } .core { height: 54px; font-size: 12px; }
+    .die { padding: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="brand">
+      <div class="logo"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#0b0d10" stroke-width="2" stroke-linecap="round"><path d="M8 2v8"/><circle cx="8" cy="12" r="2.2" fill="#0b0d10"/></svg></div>
+      ThermoSched
+    </div>
+    <div class="live mono"><i></i>LIVE SIMULATION · DAA · GROUP 11</div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- Live thermal view (simulated thermal model driven by the admitted jobs) -->
+  <section class="panel hero">
+    <div class="hero-main">
+      <div class="row">
+        <div class="eyebrow">CPU PACKAGE TEMPERATURE · SIMULATED</div>
+        <div class="seg" role="group" aria-label="Scheduler">
+          <button type="button" data-managed="false">Unmanaged</button>
+          <button type="button" data-managed="true" aria-pressed="true">ThermoSched</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap">
+        <div class="temp" id="temp">--<small>°C</small></div>
+        <div class="status" id="status"></div>
+      </div>
+      <div class="spark">
+        <svg width="100%" height="150" viewBox="0 0 600 150" preserveAspectRatio="none" role="img" aria-label="Temperature over the last 12 seconds">
+          <line id="throttle" x1="0" x2="600" stroke="#e5484d" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
+          <polygon id="area" fill="#ff7a45" opacity=".1"/>
+          <polyline id="line" fill="none" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+        </svg>
+        <span>THROTTLE 85°C</span>
+      </div>
+      <div class="chips" id="running"></div>
+    </div>
+    <div class="die-wrap">
+      <div class="die"><div class="cores" id="cores"></div></div>
+      <div class="legend"><span>40°</span><b></b><span>100°</span></div>
+    </div>
+  </section>
+
+  <!-- 01 Admit: 0/1 vs Fractional Knapsack -->
+  <section class="panel">
+    <div class="row">
+      <div class="title"><span class="num">01</span><h2>Admit</h2><span class="tag" id="algo-tag"></span></div>
+      <div class="seg" role="group" aria-label="Job type">
+        <button type="button" data-slice="false" aria-pressed="true">Whole jobs</button>
+        <button type="button" data-slice="true">Sliceable CPU time</button>
+      </div>
+    </div>
+    <div class="admit">
+      <div class="stage" id="stage">
+        <div class="track"></div>
+        <div class="lbl" style="top:76px" id="budget-lbl"></div>
+        <div class="lbl" style="top:104px;color:var(--dim)">WAITING</div>
+      </div>
+      <div style="flex:1 1 220px;display:flex;flex-direction:column;gap:6px">
+        <div class="eyebrow">BENEFIT</div>
+        <div class="big" id="benefit">0</div>
+        <div class="tag" id="benefit-note"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="grid2">
+    <!-- 02 Compute less: Matrix Chain Multiplication race -->
+    <section class="panel">
+      <div class="row">
+        <div class="title"><span class="num">02</span><h2>Compute less</h2></div>
+        <button type="button" class="icon-btn" id="replay" aria-label="Replay race">
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9a6 6 0 1 0 2-4.5"/><path d="M3 2.5V6h3.5"/></svg>
+        </button>
+      </div>
+      <div class="tag" id="chain" style="font-size:15px"></div>
+      <div class="lane"><div class="row"><span style="color:var(--muted)" id="naive-order"></span><span id="naive-count">0</span></div><div class="steps" id="naive-steps"></div><div class="step-costs" id="naive-costs"></div></div>
+      <div class="lane"><div class="row"><span id="dp-order"></span><span id="dp-count">0</span></div><div class="steps" id="dp-steps"></div><div class="step-costs" id="dp-costs"></div></div>
+      <div style="display:flex;align-items:baseline;gap:12px;margin-top:auto">
+        <div style="font-size:56px;font-weight:600;letter-spacing:-.03em;color:var(--cool)" id="saved"></div>
+        <div class="tag">scalar multiplications · O(n³) DP</div>
+      </div>
+    </section>
+
+    <!-- 03 Prioritise: Binomial vs Fibonacci heap -->
+    <section class="panel">
+      <div class="row">
+        <div class="title"><span class="num">03</span><h2>Prioritise</h2></div>
+        <div class="tag" style="font-size:12px">a job is boosted to the front</div>
+      </div>
+      <div class="minis">
+        <div class="mini"><div class="box" id="bin-box"></div><strong>Binomial</strong><div class="tag" id="bin-steps"></div></div>
+        <div class="mini"><div class="box" id="fib-box"></div><strong>Fibonacci</strong><div class="tag" id="fib-steps"></div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="chips" id="heap-chips"></div>
+        <div class="hbar"><div>Binomial</div><div class="bar"><i id="bin-bar" style="background:var(--series-1)"></i></div><div id="bin-ops"></div></div>
+        <div class="hbar"><div>Fibonacci</div><div class="bar"><i id="fib-bar" style="background:var(--series-2)"></i></div><div id="fib-ops"></div></div>
+        <div class="tag" style="font-size:12px" id="heap-n"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- 04 Index: B-Tree over time-ordered telemetry -->
+  <section class="panel">
+    <div class="row">
+      <div class="title"><span class="num">04</span><h2>Index</h2><span class="tag" id="tree-n"></span></div>
+      <div class="chips"><span class="tag" style="font-size:12px"><span style="color:var(--cool)">●</span> search &nbsp; <span style="color:var(--heat-ink)">●</span> time-range scan</span></div>
+    </div>
+    <div class="index">
+      <div class="tree" id="b-tree"></div>
+      <div class="imetrics">
+        <div><div class="metric" id="b-height"></div><div class="cap">levels (B-Tree, t = 3)</div></div>
+        <div><div class="metric" id="b-visit"></div><div class="cap">nodes / search</div></div>
+        <div><div class="metric" id="b-cmp"></div><div class="cap">comparisons / search</div></div>
+        <div><div class="metric" id="b-range"></div><div class="cap">readings in last 10 min</div></div>
+        <div style="grid-column: 1 / -1"><div class="growth" id="growth"></div><div class="cap" id="growth-cap"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Scaling (measured by experiments.py) -->
+  <section class="scale">
+    <div class="panel">
+      <div class="row"><strong>0/1 DP vs budget W</strong><span class="tag" style="font-size:12px" id="dp-n"></span></div>
+      <svg width="100%" height="120" viewBox="0 0 300 120" role="img" aria-label="0/1 DP time grows linearly with W; fractional stays flat">
+        <line x1="0" x2="300" y1="110" y2="110" stroke="#1f242c"/>
+        <polyline class="draw" id="dp-line" fill="none" stroke="#ff7a45" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline class="draw" points="6,109 294,109" fill="none" stroke="#5b8def" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>
+      <div class="foot" id="dp-foot"></div>
+    </div>
+    <div class="panel">
+      <div class="row"><strong>Matrix chain DP steps</strong><span class="tag" style="font-size:12px">n³</span></div>
+      <svg width="100%" height="120" viewBox="0 0 300 120" role="img" aria-label="Matrix chain DP steps grow cubically">
+        <line x1="0" x2="300" y1="110" y2="110" stroke="#1f242c"/>
+        <polyline class="draw" id="mcm-line" fill="none" stroke="#5b8def" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="foot" id="mcm-foot"></div>
+    </div>
+    <div class="panel">
+      <div class="row"><strong>Greedy wrong on whole jobs</strong><span class="tag" style="font-size:12px">% of instances</span></div>
+      <div class="cols" id="quality"></div>
+      <div class="foot" id="quality-foot"></div>
+    </div>
+  </section>
+
+  <footer>Numbers come from dashboard/data.js, written by python main.py. The temperature view is a simple simulated thermal model.</footer>
+</main>
+
+<script src="data.js"></script>
+<script>
+  const D = window.THERMO_DATA;
+  const $ = (id) => document.getElementById(id);
+  const fmt = (v, d = 0) => Number(v).toLocaleString("en-US", { maximumFractionDigits: d, minimumFractionDigits: d });
+  const short = (v) => v >= 1e6 ? fmt(v / 1e6, 2) + "M" : v >= 1e4 ? fmt(v / 1e3, 0) + "k" : v >= 1e3 ? +(v / 1e3).toFixed(1) + "k" : fmt(v);
+  const el = (tag, cls, parent) => { const e = document.createElement(tag); if (cls) e.className = cls; if (parent) parent.appendChild(e); return e; };
+
+  // thermal colour ramp (data colour, 0 = cool, 1 = hot)
+  const STOPS = [[0, [27, 42, 74]], [.25, [59, 58, 140]], [.5, [156, 59, 127]], [.7, [224, 83, 61]], [.85, [245, 158, 59]], [1, [255, 224, 138]]];
+  function heat(t) {
+    const x = Math.max(0, Math.min(1, t));
+    for (let i = 1; i < STOPS.length; i++) if (x <= STOPS[i][0]) {
+      const [a, ca] = STOPS[i - 1], [b, cb] = STOPS[i], f = (x - a) / (b - a);
+      return `rgb(${ca.map((v, k) => Math.round(v + (cb[k] - v) * f)).join(",")})`;
+    }
+    return "rgb(255,224,138)";
+  }
+
+  // segmented toggles: one pressed button per group
+  function toggle(selector, onPick) {
+    const buttons = document.querySelectorAll(selector);
+    buttons.forEach((b) => b.addEventListener("click", () => {
+      buttons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      onPick(b);
+    }));
+  }
+
+  if (!D) {
+    document.querySelector("main").innerHTML = "<p>No data yet. Run <code>python main.py</code> first.</p>";
+    throw new Error("missing data.js");
+  }
+
+  const peak = D.scenarios.find((s) => s.name.startsWith("Peak")) || D.scenarios[0];
+  const night = D.scenarios.find((s) => s.name.startsWith("Night")) || D.scenarios[D.scenarios.length - 1];
+  const decision = (sc, module) => sc.decisions.find((d) => d.module === module);
+  const state = { tick: 0, managed: true, slice: false, heapKind: "boost", disk: true, raceStart: 0, shown: 0 };
+
+  /* ---------------- live thermal view ---------------- */
+  const admittedPeak = decision(peak, "Job admission").detail.map(([n]) => n);
+  const totalCost = peak.jobs.reduce((a, j) => a + j.thermal_cost, 0);
+  const admittedCost = peak.jobs.filter((j) => admittedPeak.includes(j.name)).reduce((a, j) => a + j.thermal_cost, 0);
+  const offsets = [-6, -2, -1, -5, -3, 4, 6, -2, -1, 5, 7, 0, -6, -1, 1, -4];
+  const cores = offsets.map(() => el("div", "core", $("cores")));
+  const runChips = peak.jobs.map((j) => { const c = el("div", "runchip", $("running")); c.textContent = j.name.split(" ")[0]; return c; });
+  let T = 64, hist = Array.from({ length: 60 }, () => 64);
+  const yOf = (t) => 150 - ((t - 30) / 70) * 150;
+  $("throttle").setAttribute("y1", yOf(85)); $("throttle").setAttribute("y2", yOf(85));
+  toggle("[data-managed]", (b) => { state.managed = b.dataset.managed === "true"; });
+
+  function updateThermal() {
+    const load = state.managed ? admittedCost : totalCost;           // heat follows the admitted thermal cost
+    const target = 34 + 0.6 * load * (0.95 + Math.random() * 0.1);
+    T += (target - T) * 0.06 + (Math.random() - 0.5) * 0.8;
+    hist = hist.slice(1).concat(T);
+    const color = heat((T - 40) / 60 * 0.9 + 0.1);
+    $("temp").firstChild.nodeValue = T.toFixed(1);
+    $("temp").style.color = color;
+    const hot = T > 85;
+    $("status").className = "status" + (hot ? " hot" : "");
+    $("status").textContent = hot ? "THROTTLING" : "WITHIN BUDGET";
+    const pts = hist.map((t, i) => `${(i * 600 / 59).toFixed(1)},${yOf(t).toFixed(1)}`).join(" ");
+    $("line").setAttribute("points", pts); $("line").setAttribute("stroke", color);
+    $("area").setAttribute("points", `0,150 ${pts} 600,150`);
+    cores.forEach((c, i) => {
+      const t = T + offsets[i] + Math.sin((state.tick + i * 3) / 5) * 1.5, n = (t - 40) / 60;
+      c.textContent = Math.round(t) + "°"; c.style.background = heat(n); c.style.color = n > .78 ? "#1a1206" : "#f3f4f6";
+    });
+    runChips.forEach((c, i) => c.classList.toggle("on", !state.managed || admittedPeak.includes(peak.jobs[i].name)));
+  }
+
+  /* ---------------- 01 admit ---------------- */
+  const budget = peak.budget;
+  $("budget-lbl").textContent = `BUDGET ${budget}`;
+  const blocks = Object.fromEntries(peak.jobs.map((j) => {
+    const b = el("div", "block", $("stage"));
+    b.innerHTML = `<span>${j.name.split(" ")[0]}</span><span></span>`;
+    return [j.name, b];
+  }));
+  toggle("[data-slice]", (b) => { state.slice = b.dataset.slice === "true"; layoutBlocks(); });
+
+  function layoutBlocks() {
+    // every job keeps its own block; toggling only moves it between the budget track and the waiting row
+    const sc = state.slice ? night : peak;
+    const d = decision(sc, "Job admission");
+    const share = Object.fromEntries(d.detail);
+    const waiting = sc.jobs.filter((j) => !share[j.name]);
+    const waitTotal = waiting.reduce((a, j) => a + j.thermal_cost, 0);
+    const waitScale = Math.min(1, budget / Math.max(waitTotal, 1));
+    const palette = state.slice ? ["#5b8def", "#3e6fd8", "#8ab0f5"] : ["#ff7a45", "#f25f2c", "#ff9b6b"];
+    let x = 0, wx = 0, k = 0;
+    for (const j of sc.jobs) {
+      const b = blocks[j.name], f = share[j.name];
+      let left, width;
+      if (f) {
+        width = j.thermal_cost * f / budget * 100; left = x; x += width;
+        Object.assign(b.style, { top: "4px", height: "60px", background: palette[k++ % 3], color: "#0b0d10", border: "1px solid transparent" });
+        b.lastChild.textContent = f < 1 ? `${Math.round(f * 100)}%` : `+${j.benefit}`;
+      } else {
+        width = j.thermal_cost / budget * 100 * waitScale; left = wx; wx += width + 1;
+        Object.assign(b.style, { top: "124px", height: "44px", background: "#1a1f26", color: "#8b93a1", border: "1px solid #2a313b" });
+        b.lastChild.textContent = `${j.thermal_cost}u`;
+      }
+      b.style.left = `calc(${left}% + 2px)`; b.style.width = `calc(${width}% - 4px)`;
+    }
+    $("algo-tag").textContent = state.slice ? "fractional · greedy · O(n log n)" : "0/1 · dynamic programming · O(n·W)";
+    const names = d.detail.map(([n, f]) => (f < 1 ? `${Math.round(f * 100)}% ` : "") + n.split(" ")[0]).join(" + ");
+    $("benefit-note").textContent = state.slice ? names : `${names} · greedy would get ${fmt(d.measure.alt_benefit)}`;
+  }
+
+  function updateBenefit() {
+    const goal = decision(state.slice ? night : peak, "Job admission").measure.benefit;
+    state.shown = Math.abs(goal - state.shown) < .6 ? goal : state.shown + (goal - state.shown) * .35;
+    $("benefit").textContent = fmt(state.shown);
+  }
+
+  /* ---------------- 02 compute less ---------------- */
+  const mcm = decision(peak, "Computation reduction");
+  const dims = (mcm.property.match(/\[(.*)\]/) || [, ""])[1].split(",").map(Number);
+  const order = mcm.result.split(":")[0];                                  // e.g. ((A1A2)(A3A4))
+  $("chain").innerHTML = dims.slice(1).map((c, i) => `A${i + 1}&thinsp;<span style="color:var(--dim)">${dims[i]}×${c}</span>`).join(" &nbsp;·&nbsp; ");
+  $("naive-order").textContent = "left to right";
+  $("dp-order").textContent = order;
+  $("saved").textContent = `−${Math.round(mcm.measure.saved_pct)}%`;
+  $("replay").addEventListener("click", () => { state.raceStart = state.tick; });
+
+  // cost of each multiplication, in the order it happens
+  const naiveCosts = dims.slice(2).map((c, k) => dims[0] * dims[k + 1] * c);
+  function bracketCosts(text) {
+    let pos = 0;
+    const costs = [];
+    function parse() {                                   // returns [rows, cols] of the sub-product
+      if (text[pos] === "A") {
+        pos++; let n = "";
+        while (/[0-9]/.test(text[pos])) n += text[pos++];
+        return [dims[n - 1], dims[n]];
+      }
+      pos++;                                             // "("
+      const left = parse(), right = parse();
+      pos++;                                             // ")"
+      costs.push(left[0] * left[1] * right[1]);
+      return [left[0], right[1]];
+    }
+    parse();
+    return costs;
+  }
+  const dpCosts = bracketCosts(order);
+  const naiveTotal = naiveCosts.reduce((a, b) => a + b, 0);
+  function lane(stepsId, costsId, costs) {
+    return costs.map((c) => {
+      const seg = el("div", "", $(stepsId)); seg.style.width = (c / naiveTotal * 100) + "%";
+      const fill = el("i", "", seg); fill.style.background = stepsId === "dp-steps" ? "var(--cool)" : "var(--dim)";
+      const label = el("span", "", $(costsId)); label.style.width = seg.style.width; label.textContent = short(c);
+      return { cost: c, fill };
+    });
+  }
+  const naiveLane = lane("naive-steps", "naive-costs", naiveCosts), dpLane = lane("dp-steps", "dp-costs", dpCosts);
+
+  function updateRace() {
+    if (state.tick - state.raceStart > 60) state.raceStart = state.tick;     // auto replay
+    const work = Math.min(1, (state.tick - state.raceStart) / 30) * naiveTotal;   // both orders run at the same speed
+    for (const segs of [naiveLane, dpLane]) {
+      let start = 0;
+      for (const s of segs) { s.fill.style.width = Math.max(0, Math.min(1, (work - start) / s.cost)) * 100 + "%"; start += s.cost; }
+    }
+    $("naive-count").textContent = fmt(Math.min(work, naiveTotal));
+    $("dp-count").textContent = fmt(Math.min(work, mcm.measure.optimal));
+  }
+
+  /* ---------------- 03 prioritise ---------------- */
+  // an 8-node binomial tree B3: the job at the deepest leaf is boosted to the front
+  const SLOT = { R: [100, 14], c2: [44, 56], c1: [116, 56], c0: [176, 56], c21: [20, 98], c20: [68, 98], c10: [116, 98], c210: [20, 138] };
+  const EDGES = [["R", "c2"], ["R", "c1"], ["R", "c0"], ["c2", "c21"], ["c2", "c20"], ["c1", "c10"], ["c21", "c210"]];
+  const SVGNS = "http://www.w3.org/2000/svg";
+  function svgLine(svg, x1, y1, x2, y2) {
+    const l = document.createElementNS(SVGNS, "line");
+    Object.entries({ x1, y1, x2, y2, stroke: "#2a313b", "stroke-width": 1.5, "vector-effect": "non-scaling-stroke" }).forEach(([k, v]) => l.setAttribute(k, v));
+    svg.appendChild(l);
+    return l;
+  }
+  function miniTree(box) {
+    const svg = document.createElementNS(SVGNS, "svg");
+    svg.setAttribute("width", 200); svg.setAttribute("height", 150); svg.setAttribute("aria-hidden", "true");
+    const lines = EDGES.map(([a, b]) => svgLine(svg, ...SLOT[a], ...SLOT[b]));
+    box.appendChild(svg);
+    const dots = {};
+    ["a3", "a2", "a1", "c1", "c0", "c20", "c10", "boost"].forEach((id) => { dots[id] = el("div", "dot" + (id === "boost" ? " hot" : ""), box); });
+    return { dots, lines };
+  }
+  const place = (d, slot) => { const [x, y] = Array.isArray(slot) ? slot : SLOT[slot]; d.style.left = x + "px"; d.style.top = y + "px"; };
+  const bin = miniTree($("bin-box")), fib = miniTree($("fib-box"));
+  ["c1", "c0", "c20", "c10"].forEach((s) => { place(bin.dots[s], s); place(fib.dots[s], s); });
+  place(fib.dots.a3, "R"); place(fib.dots.a2, "c2"); place(fib.dots.a1, "c21");
+
+  function updateHeapDemo() {
+    const phase = Math.floor((state.tick % 28) / 5), k = Math.min(phase, 3);
+    const path = ["c210", "c21", "c2", "R"];
+    place(bin.dots.boost, path[k]);                       // binomial: swap up one level per step
+    place(bin.dots.a1, k >= 1 ? "c210" : "c21");
+    place(bin.dots.a2, k >= 2 ? "c21" : "c2");
+    place(bin.dots.a3, k >= 3 ? "c2" : "R");
+    const cut = phase >= 1;                               // fibonacci: one cut to the root list
+    place(fib.dots.boost, cut ? [180, 14] : "c210");
+    fib.dots.a1.classList.toggle("mark", cut);
+    fib.lines[6].style.opacity = cut ? 0 : 1;
+    $("bin-steps").textContent = `${k} swap${k === 1 ? "" : "s"} up`;
+    $("fib-steps").textContent = `${cut ? 1 : 0} cut`;
+  }
+
+  const heapRows = D.experiments.heap_comparison;
+  const heapN = Math.max(...heapRows.map((r) => r.n));
+  const HEAP_KINDS = [["none", "No updates", (r) => r.update_kind === "none"],
+                      ["aging", "Small nudges", (r) => r.update_kind === "aging"],
+                      ["boost", "Boosts", (r) => r.update_kind === "boost" && r.updates_per_dispatch === 1]];
+  const heapChips = HEAP_KINDS.map(([key, label]) => {
+    const c = el("button", "chip", $("heap-chips")); c.type = "button"; c.textContent = label;
+    c.addEventListener("click", () => { state.heapKind = key; updateHeapBars(); });
+    return [key, c];
+  });
+  $("heap-n").textContent = `operations · ${fmt(heapN)} jobs`;
+  function updateHeapBars() {
+    const match = HEAP_KINDS.find(([k]) => k === state.heapKind)[2];
+    const row = heapRows.find((r) => r.n === heapN && match(r));
+    const max = Math.max(...heapRows.filter((r) => r.n === heapN).flatMap((r) => [r.binomial_ops, r.fibonacci_ops]));
+    $("bin-bar").style.width = (row.binomial_ops / max * 100) + "%"; $("fib-bar").style.width = (row.fibonacci_ops / max * 100) + "%";
+    $("bin-ops").textContent = short(row.binomial_ops); $("fib-ops").textContent = short(row.fibonacci_ops);
+    heapChips.forEach(([k, c]) => c.setAttribute("aria-pressed", String(k === state.heapKind)));
+  }
+
+  /* ---------------- 04 index ---------------- */
+  const bs = D.experiments.btree_scaling, big = bs[bs.length - 1];
+  const tele = decision(peak, "Telemetry index").measure;
+  $("tree-n").textContent = `${fmt(big.n)} readings`;
+  $("b-height").textContent = big.height;
+  $("b-visit").textContent = fmt(big.nodes_visited, 1);
+  $("b-cmp").textContent = fmt(big.comparisons, 1);
+  $("b-range").textContent = tele.range_hits;
+  const hMax = Math.max(...bs.map((r) => r.height));
+  bs.forEach((r, i) => {
+    const c = el("div", "", $("growth"));
+    c.innerHTML = `<span>${r.height}</span><i style="height:${r.height / hMax * 36}px;animation-delay:${i * 80}ms"></i><span>${short(r.n)}</span>`;
+  });
+  $("growth-cap").textContent = "levels as readings grow ×50: logarithmic";
+
+  // B-Tree drawing: 1 root, 3 children, 9 leaves (wide nodes, all leaves on one level)
+  const LEVELS = [[180], [60, 180, 300], [20, 60, 100, 140, 180, 220, 260, 300, 340]];
+  const treeSvg = document.createElementNS(SVGNS, "svg");
+  Object.entries({ width: "100%", height: 170, viewBox: "0 0 360 170", preserveAspectRatio: "none", "aria-hidden": "true" }).forEach(([k, v]) => treeSvg.setAttribute(k, v));
+  $("b-tree").appendChild(treeSvg);
+  const nodes = LEVELS.map((xs, lvl) => xs.map((x, i) => {
+    if (lvl > 0) svgLine(treeSvg, LEVELS[lvl - 1][Math.floor(i / 3)], 30 + (lvl - 1) * 62, x, 14 + lvl * 62);
+    const n = el("div", "tnode", $("b-tree")), w = lvl === 2 ? 34 : 56;
+    Object.assign(n.style, { left: (x / 3.6) + "%", top: (14 + lvl * 62) + "px", width: w + "px", height: "16px", marginLeft: (-w / 2) + "px", borderRadius: "5px" });
+    return n;
+  }));
+  const SEARCH = [0, 0, 2];                                  // root -> first child -> third leaf
+  function updateSearch() {
+    const t = state.tick % 40;
+    nodes.forEach((lvl, l) => lvl.forEach((n, i) => {
+      n.classList.toggle("lit", t >= l * 3 && i === SEARCH[l]);            // descend one level every 0.6 s
+      n.classList.toggle("scan", l === 2 && i > 2 && t >= 9 + (i - 3) * 3); // then sweep right along the leaves
+    }));
+  }
+
+  /* ---------------- scaling charts (measured) ---------------- */
+  function linePoints(xs, ys) {
+    const xMax = Math.max(...xs), yMax = Math.max(...ys);
+    return xs.map((x, i) => `${(6 + x / xMax * 288).toFixed(1)},${(110 - ys[i] / yMax * 100).toFixed(1)}`).join(" ");
+  }
+  const nMax = Math.max(...D.experiments.knapsack_scaling.map((r) => r.n));
+  const ks = D.experiments.knapsack_scaling.filter((r) => r.n === nMax);
+  $("dp-n").textContent = `ms · n = ${nMax}`;
+  $("dp-line").setAttribute("points", linePoints([0, ...ks.map((r) => r.W)], [0, ...ks.map((r) => r.dp_ms)]));
+  $("dp-foot").innerHTML = `<span><span style="color:#ff8a57">●</span> 0/1 · ${fmt(ks[0].dp_ms, 1)} → ${fmt(ks[ks.length - 1].dp_ms, 0)}</span><span><span style="color:#5b8def">●</span> fractional · ${fmt(ks[ks.length - 1].frac_ms, 2)}</span>`;
+  const mc = D.experiments.matrix_chain_scaling;
+  $("mcm-line").setAttribute("points", linePoints(mc.map((r) => r.n), mc.map((r) => r.dp_steps)));
+  $("mcm-foot").innerHTML = `<span>n = ${mc[0].n}</span><span>n = ${mc[mc.length - 1].n} · ${short(mc[mc.length - 1].dp_steps)}</span>`;
+  const q = D.experiments.knapsack_quality, qMax = Math.max(...q.map((r) => r.greedy_wrong_pct));
+  q.forEach((r, i) => {
+    const c = el("div", "", $("quality"));
+    c.innerHTML = `<span>${Math.round(r.greedy_wrong_pct)}</span><i style="height:${r.greedy_wrong_pct / qMax * 100}px;animation-delay:${i * 80}ms"></i>`;
+  });
+  $("quality-foot").innerHTML = q.map((r, i) => `<span>${i === 0 ? "n = " : ""}${r.n}${i === q.length - 1 ? " jobs" : ""}</span>`).join("");
+
+  /* ---------------- one clock drives every live element ---------------- */
+  layoutBlocks(); updateHeapBars();
+  function tick() { state.tick++; updateThermal(); updateBenefit(); updateRace(); updateHeapDemo(); updateSearch(); }
+  tick();
+  setInterval(tick, 200);
+</script>
+</body>
+</html>
